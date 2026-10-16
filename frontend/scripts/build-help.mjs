@@ -382,7 +382,8 @@ const files = [
   [path.join(OUT_DIR, "index.json"), `${JSON.stringify(final.map((a) => ({ slug: a.slug, title: a.title, group: a.group })))}\n`],
 ];
 if (CHECK) {
-  const stale = files.filter(([file, data]) => !existsSync(file) || readFileSync(file, "utf8") !== data).map(([file]) => path.relative(FRONTEND, file));
+  // Line endings ignored: git may check the JSON out with CRLF on Windows.
+  const stale = files.filter(([file, data]) => !existsSync(file) || readFileSync(file, "utf8").replace(/\r\n/g, "\n") !== data).map(([file]) => path.relative(FRONTEND, file));
   if (stale.length) {
     console.error(`[help] out of date: ${stale.join(", ")}. Run: npm run help:build`);
     process.exit(1);
