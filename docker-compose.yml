@@ -1,0 +1,119 @@
+# Local/staging stack: PostgreSQL (pgvector), Redis, API, job-queue workers, dashboard.
+# Usage:  cp .env.example .env  →  docker compose up --build
+# Scale:  docker compose up --build --scale worker=4      (each worker: 4 concurrent jobs)
+# Celery: OPSPILOT_WORKER_MODE=celery docker compose --profile celery up --build
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql+psycopg://opspilot:opspilot@db:5432/opspilot
+  REDIS_URL: redis://redis:6379/0
+  ENABLE_PGVECTOR: "true"
+  WORKER_MODE: ${OPSPILOT_WORKER_MODE:-db}
+  MCP_ALLOWED_HOSTS: "127.0.0.1:*,localhost:*,api:*"
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: opspilot
+      POSTGRES_PASSWORD: opspilot
+      POSTGRES_DB: opspilot
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opspilot"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "5432:5432"
+
+  redis:  # rate limiting across API replicas (and the broker in celery mode)
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build: ./backend
+    env_file: .env
+    environment: *backend-env
+    command: ["sh", "-c", "alembic upgrade head && python -m app.cli seed"]
+    healthcheck:
+      disable: true
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:  # also runs the 60 s maintenance scheduler (lease reaping, reconciliation, audit sealing)
+    build: ./backend
+    env_file: .env
+    environment: *backend-env
+    ports:
+      - "8000:8000"
+    volumes:
+      - storage:/app/storage
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  worker:  # drains the durable job queue: workflows, Copilot turns, bulk-run items
+    build: ./backend
+    env_file: .env
+    environment: *backend-env
+    command: ["python", "-m", "app.workers.runner", "--concurrency", "4"]
+    stop_grace_period: 60s  # SIGTERM: stop claiming, finish running jobs
+    healthcheck:
+      disable: true  # no HTTP port; liveness is the heartbeat shown on /system
+    volumes:
+      - storage:/app/storage
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  celery-worker:
+    profiles: ["celery"]
+    build: ./backend
+    env_file: .env
+    environment: *backend-env
+    command: ["celery", "-A", "app.workers.celery_app:celery_app", "worker", "-Q", "workflows", "-l", "info", "--concurrency=4"]
+    healthcheck:
+      disable: true
+    volumes:
+      - storage:/app/storage
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  beat:
+    profiles: ["celery"]
+    build: ./backend
+    env_file: .env
+    environment: *backend-env
+    command: ["celery", "-A", "app.workers.celery_app:celery_app", "beat", "-l", "info"]
+    healthcheck:
+      disable: true
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  web:  # the browser talks only to this origin; /api/v1/* is proxied to the api service
+    build: ./frontend
+    environment:
+      OPSPILOT_API_ORIGIN: http://api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  redisdata:
+  storage:

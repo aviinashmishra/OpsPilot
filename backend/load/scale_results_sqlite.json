@@ -1,0 +1,73 @@
+{
+  "items": 300,
+  "per_worker_concurrency": 4,
+  "api_processes": 1,
+  "database": "sqlite (WAL)",
+  "cpu_count": 8,
+  "throughput": [
+    {
+      "worker_processes": 1,
+      "total_concurrency": 4,
+      "items": 300,
+      "completed": 300,
+      "failed": 0,
+      "wall_seconds": 26.15,
+      "items_per_second": 11.47,
+      "item_statuses": {
+        "completed": 300
+      },
+      "agent_runs": 300,
+      "side_effects": 600,
+      "distinct_side_effect_keys": 600,
+      "leads_created": 300,
+      "max_creates_for_one_lead": 1
+    },
+    {
+      "worker_processes": 4,
+      "total_concurrency": 16,
+      "items": 300,
+      "completed": 300,
+      "failed": 0,
+      "wall_seconds": 46.12,
+      "items_per_second": 6.5,
+      "item_statuses": {
+        "completed": 300
+      },
+      "agent_runs": 300,
+      "side_effects": 600,
+      "distinct_side_effect_keys": 600,
+      "leads_created": 300,
+      "max_creates_for_one_lead": 1
+    }
+  ],
+  "ingestion": {
+    "requests": 400,
+    "unique_events": 320,
+    "status_codes": {
+      "202": 400
+    },
+    "duplicates_detected": 80,
+    "workflow_runs_created": 320,
+    "requests_per_second": 27.6,
+    "p50_ms": 850.7,
+    "p95_ms": 3189.9,
+    "max_ms": 5411.1
+  },
+  "crash_recovery": {
+    "items": 150,
+    "worker_killed_at_processed": 54,
+    "completed": 150,
+    "failed": 0,
+    "status": "completed",
+    "wall_seconds": 33.25,
+    "item_statuses": {
+      "completed": 150
+    },
+    "agent_runs": 151,
+    "side_effects": 300,
+    "distinct_side_effect_keys": 300,
+    "leads_created": 150,
+    "max_creates_for_one_lead": 1
+  },
+  "problems": []
+}

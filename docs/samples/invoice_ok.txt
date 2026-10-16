@@ -1,0 +1,9 @@
+Northwind Components
+Invoice No: NW-2026-201
+Date: 2026-10-01
+Due Date: 2026-10-31
+PO Number: PO-7001
+Driver units          400   12.00    4,800.00
+Subtotal: 4,800.00
+Tax (0%): 0.00
+Total Due: 4,800.00

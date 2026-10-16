@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (lint, tests on SQLite and PostgreSQL, security scans)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: opspilot
+          POSTGRES_PASSWORD: opspilot
+          POSTGRES_DB: opspilot_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U opspilot" --health-interval 5s --health-timeout 3s --health-retries 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Lint
+        run: ruff check app tests load alembic
+      - name: Unit, integration, security, agent and e2e tests (SQLite)
+        run: pytest -q --cov=app --cov-report=term-missing --cov-fail-under=70
+      - name: Full test suite on PostgreSQL (schema built by the migrations; RLS, SKIP LOCKED, advisory locks)
+        env:
+          TEST_DATABASE_URL: postgresql+psycopg://opspilot:opspilot@localhost:5432/opspilot_test
+        run: pytest -q
+      - name: Migrations down/up + alembic check on PostgreSQL
+        env:
+          DATABASE_URL: postgresql+psycopg://opspilot:opspilot@localhost:5432/opspilot_test
+        run: |
+          alembic downgrade base
+          alembic upgrade head
+          alembic check
+          alembic downgrade base
+      - name: Multi-process scale + crash test on PostgreSQL (real worker processes; fails on any duplicate side effect)
+        run: python -m load.scale_benchmark --items 80 --workers 1,3 --events 80 --database-url postgresql+psycopg://opspilot:opspilot@localhost:5432/opspilot_test --check
+      - name: Evaluation smoke on PostgreSQL
+        env:
+          DATABASE_URL: postgresql+psycopg://opspilot:opspilot@localhost:5432/opspilot_test
+        run: python -m app.cli evaluate --agent lead_qualification
+      - name: Dependency vulnerability audit
+        run: pip-audit -r requirements.txt --strict
+      - name: Static security scan
+        run: bandit -q -r app -x app/seed -ll
+
+  frontend:
+    name: Frontend (lint, type-check, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  containers:
+    name: Build and scan containers
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: false
+          load: true
+          tags: opspilot-api:ci
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          push: false
+          load: true
+          tags: opspilot-web:ci
+      - name: Scan images (Trivy)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: opspilot-api:ci
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"

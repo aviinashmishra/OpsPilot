@@ -1,0 +1,65 @@
+# Render Blueprint: OpsPilot API + dashboard.
+# Render → New → Blueprint → pick this repo. You are prompted for the `sync: false` values.
+# Region "ohio" sits next to Neon's aws-us-east-2, which keeps database round trips ~1-2 ms.
+# See docs/DEPLOYMENT.md → "Render / Vercel" for the full walkthrough.
+services:
+  - type: web
+    name: opspilot-api
+    runtime: python
+    region: ohio
+    plan: free
+    rootDir: backend
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    # Migrations and the (idempotent) demo seed run on every boot, then the API starts.
+    startCommand: alembic upgrade head && python -m app.cli seed && uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips "*"
+    healthCheckPath: /health/live
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: APP_ENV
+        value: staging
+      - key: LOG_JSON
+        value: "true"
+      - key: DATABASE_URL          # Neon connection string (direct endpoint, ?sslmode=require)
+        sync: false
+      - key: ENABLE_PGVECTOR
+        value: "true"
+      - key: DB_POOL_SIZE
+        value: "5"
+      - key: DB_POOL_RECYCLE_SECONDS
+        value: "300"
+      - key: WORKER_MODE           # jobs run inside the API process (one instance)
+        value: thread
+      - key: SECRET_KEY
+        generateValue: true
+      - key: WEBHOOK_SIGNING_SECRET
+        generateValue: true
+      - key: DEMO_PASSWORD         # password for the seeded demo accounts; never use the public default here
+        sync: false
+      - key: LLM_PROVIDER
+        value: gemini
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: LLM_DEFAULT_MODEL
+        value: gemini-3.6-flash
+      - key: LLM_FAST_MODEL
+        value: gemini-3.6-flash
+      - key: LLM_MAX_OUTPUT_TOKENS
+        value: "8192"
+
+  - type: web
+    name: opspilot-web
+    runtime: node
+    region: ohio
+    plan: free
+    rootDir: frontend
+    buildCommand: npm ci --no-audit --no-fund && npm run build
+    startCommand: npx next start -p $PORT -H 0.0.0.0
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: OPSPILOT_API_ORIGIN   # public URL of the API service, e.g. https://opspilot-api.onrender.com
+        sync: false

@@ -1,0 +1,47 @@
+{
+  "name": "opspilot-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OpsPilot AI administrative dashboard",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@radix-ui/react-dialog": "1.1.1",
+    "@radix-ui/react-dropdown-menu": "2.1.1",
+    "@radix-ui/react-popover": "1.1.1",
+    "@radix-ui/react-select": "2.1.1",
+    "@radix-ui/react-switch": "1.1.0",
+    "@radix-ui/react-tabs": "1.1.0",
+    "@radix-ui/react-tooltip": "1.1.2",
+    "@tanstack/react-query": "5.56.2",
+    "clsx": "2.1.1",
+    "cmdk": "1.0.0",
+    "date-fns": "3.6.0",
+    "framer-motion": "11.5.4",
+    "lucide-react": "0.445.0",
+    "next": "14.2.15",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "reactflow": "11.11.4",
+    "recharts": "2.12.7",
+    "sonner": "1.5.0",
+    "tailwind-merge": "2.5.2",
+    "zustand": "4.5.5"
+  },
+  "devDependencies": {
+    "@types/node": "20.16.5",
+    "@types/react": "18.3.5",
+    "@types/react-dom": "18.3.0",
+    "autoprefixer": "10.4.20",
+    "eslint": "8.57.0",
+    "eslint-config-next": "14.2.15",
+    "postcss": "8.4.47",
+    "tailwindcss": "3.4.13",
+    "typescript": "5.5.4"
+  }
+}
