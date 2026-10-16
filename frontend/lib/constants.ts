@@ -8,6 +8,7 @@ import {
   FileText,
   FlaskConical,
   LayoutDashboard,
+  LifeBuoy,
   Plug,
   ScrollText,
   Server,
@@ -72,6 +73,10 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/documents", label: "Documents", icon: FileText, permissions: ["documents:read"] },
       { href: "/admin", label: "Admin", icon: Settings, permissions: ["tenant:read", "users:read", "roles:read", "apikeys:admin", "usage:read"] },
     ],
+  },
+  {
+    label: "Learn",
+    items: [{ href: "/help", label: "Help center", icon: LifeBuoy }],
   },
 ];
 

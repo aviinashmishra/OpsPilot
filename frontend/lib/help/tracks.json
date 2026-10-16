@@ -1,0 +1,54 @@
+[
+  {
+    "id": "business",
+    "title": "Everyday users",
+    "who": "Operators, approvers, finance approvers, auditors and viewers who use the dashboard to get work done.",
+    "roles": ["operator", "approver", "finance_approver", "auditor", "viewer"],
+    "icon": "users",
+    "steps": [
+      { "title": "Find your way around", "articles": ["what-opspilot-is", "signing-in", "the-screen-layout", "roles-and-permissions"] },
+      { "title": "Do your daily work", "articles": ["copilot", "copilot-guide", "approvals", "tasks", "workflows", "overview"] },
+      { "title": "Step-by-step tasks", "articles": ["qualify-a-lead-and-push-it-to-crm", "process-an-invoice", "approve-a-purchase-order", "bulk-score-leads-from-a-csv", "deal-with-a-failed-or-timed-out-run"] },
+      { "title": "When something looks wrong", "articles": ["troubleshooting-and-faq", "glossary"] }
+    ]
+  },
+  {
+    "id": "admins",
+    "title": "Workspace admins",
+    "who": "People who manage users, roles, integrations, agents, documents and safety settings for a workspace.",
+    "roles": ["admin"],
+    "icon": "settings",
+    "steps": [
+      { "title": "Set up your workspace", "articles": ["roles-and-permissions", "admin", "integrations", "documents"] },
+      { "title": "Control what the AI may do", "articles": ["agents", "approvals", "evaluations", "run-evaluations", "emergency-stop"] },
+      { "title": "Extend OpsPilot", "articles": ["add-a-knowledge-base-document-and-test-retrieval", "add-a-custom-http-tool", "connect-claude-desktop-or-claude-code-via-mcp"] },
+      { "title": "Keep it healthy", "articles": ["audit-trail", "incidents", "scale-and-workers", "troubleshooting-and-faq", "limitations"] }
+    ]
+  },
+  {
+    "id": "developers",
+    "title": "Developers & IT",
+    "who": "Engineers and IT teams who install, configure, deploy, integrate and secure OpsPilot.",
+    "roles": [],
+    "icon": "code",
+    "steps": [
+      { "title": "Install and configure", "articles": ["starting-and-stopping-the-app-windows", "project-readme", "configuration", "appendix-for-technical-admins"] },
+      { "title": "Deploy and operate", "articles": ["deployment", "scale-and-workers", "limitations"] },
+      { "title": "Integrate", "articles": ["api-reference", "connect-claude-desktop-or-claude-code-via-mcp", "add-a-custom-http-tool", "tool-reference", "agent-reference", "workflow-reference"] },
+      { "title": "Understand and secure", "articles": ["architecture", "security-threat-model"] }
+    ]
+  },
+  {
+    "id": "executives",
+    "title": "Executives",
+    "who": "Leaders deciding whether OpsPilot is worth it, and what keeps it safe and accountable.",
+    "roles": [],
+    "icon": "briefcase",
+    "steps": [
+      { "title": "What it is", "articles": ["what-opspilot-is", "agent-reference"] },
+      { "title": "Value and results", "articles": ["kpi-and-roi", "analytics", "overview"] },
+      { "title": "Safeguards and accountability", "articles": ["approvals", "audit-trail", "roles-and-permissions", "security-threat-model"] },
+      { "title": "What to know before rollout", "articles": ["limitations"] }
+    ]
+  }
+]

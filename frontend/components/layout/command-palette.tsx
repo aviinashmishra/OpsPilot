@@ -1,13 +1,14 @@
 "use client";
 
 import { Command } from "cmdk";
-import { Bot, CornerDownLeft, LogOut, Moon, Play, Search, Sparkles, Sun } from "lucide-react";
+import { BookOpen, Bot, CornerDownLeft, LogOut, Moon, Play, Search, Sparkles, Sun } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useTheme } from "@/components/providers/theme-provider";
 import { Kbd } from "@/components/ui/misc";
 import { ALL_NAV_ITEMS } from "@/lib/constants";
+import { HELP_INDEX } from "@/lib/help/routes";
 import { useCan } from "@/lib/permissions";
 import { useAgents } from "@/lib/queries";
 import { useSession } from "@/lib/session";
@@ -141,6 +142,18 @@ export function CommandPalette() {
                 </span>
               </Command.Item>
             ))}
+          </Command.Group>
+        ) : null}
+        {question ? (
+          <Command.Group heading="Help">
+            {HELP_INDEX.map((entry) => (
+              <Command.Item key={entry.slug} value={`help ${entry.title} ${entry.slug}`} onSelect={() => go(`/help/${entry.slug}`)} className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-sm text-fg data-[selected=true]:bg-surface-2">
+                <BookOpen className="h-4 w-4 text-fg-muted" aria-hidden /> {entry.title}
+              </Command.Item>
+            ))}
+            <Command.Item value={`help search ${question}`} onSelect={() => go(`/help?q=${encodeURIComponent(question)}`)} className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-sm text-fg data-[selected=true]:bg-surface-2">
+              <Search className="h-4 w-4 text-fg-muted" aria-hidden /> Search the help for “{question}”
+            </Command.Item>
           </Command.Group>
         ) : null}
       </Command.List>

@@ -74,6 +74,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - run: npm run help:check # committed Help center content must match docs/ (deploy builds can't regenerate it)
       - run: npm run lint
       - run: npm run build
 

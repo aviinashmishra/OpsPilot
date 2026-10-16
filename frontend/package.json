@@ -4,8 +4,12 @@
   "private": true,
   "description": "OpsPilot AI administrative dashboard",
   "scripts": {
+    "predev": "node scripts/build-help.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/build-help.mjs",
     "build": "next build",
+    "help:build": "node scripts/build-help.mjs",
+    "help:check": "node scripts/build-help.mjs --check",
     "start": "next start -p 3000",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
@@ -27,8 +31,10 @@
     "next": "14.2.15",
     "react": "18.3.1",
     "react-dom": "18.3.1",
+    "react-markdown": "9.0.1",
     "reactflow": "11.11.4",
     "recharts": "2.12.7",
+    "remark-gfm": "4.0.0",
     "sonner": "1.5.0",
     "tailwind-merge": "2.5.2",
     "zustand": "4.5.5"

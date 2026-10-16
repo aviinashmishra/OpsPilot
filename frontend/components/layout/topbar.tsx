@@ -1,17 +1,18 @@
 "use client";
 
-import { ChevronDown, LogOut, Menu, Moon, Search, ShieldAlert, Sun, User } from "lucide-react";
+import { ChevronDown, CircleHelp, LogOut, Menu, Moon, Search, ShieldAlert, Sun, User } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { useTheme } from "@/components/providers/theme-provider";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Kbd } from "@/components/ui/misc";
 import { Tip } from "@/components/ui/tooltip";
+import { helpHrefFor } from "@/lib/help/routes";
 import { useSession } from "@/lib/session";
 import { useUi } from "@/lib/ui-store";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,20 @@ export function ThemeToggle({ className }: { className?: string }) {
       <Button variant="ghost" size="icon" onClick={toggle} aria-label={`Switch to ${next} mode`} className={className}>
         {theme === "dark" ? <Sun className="h-4 w-4" aria-hidden /> : <Moon className="h-4 w-4" aria-hidden />}
       </Button>
+    </Tip>
+  );
+}
+
+/** Opens the help article for the current page (or the Help center). */
+export function HelpButton() {
+  const pathname = usePathname() ?? "";
+  const href = helpHrefFor(pathname);
+  const label = href === "/help" ? "Help center" : "Help for this page";
+  return (
+    <Tip content={label}>
+      <Link href={href} className={buttonVariants({ variant: "ghost", size: "icon" })} aria-label={label} data-testid="help-button">
+        <CircleHelp className="h-4 w-4" aria-hidden />
+      </Link>
     </Tip>
   );
 }
@@ -129,6 +144,7 @@ export function Topbar() {
             <Kbd>K</Kbd>
           </span>
         </button>
+        <HelpButton />
         <ThemeToggle />
         <UserMenu />
       </div>

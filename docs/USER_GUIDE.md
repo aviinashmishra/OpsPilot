@@ -162,13 +162,14 @@ The demo tenant (`acme-demo`, "Acme Demo Co.") is filled with synthetic records.
 
 ### 2.4 The screen layout
 
-**Sidebar (left).** Pages are grouped into three sections. You only see pages your role allows.
+**Sidebar (left).** Pages are grouped into four sections. You only see pages your role allows (everyone sees the Help center).
 
 | Section | Pages |
 |---|---|
 | Operate | Copilot, Overview, Agents, Workflows, Approvals, Tasks |
 | Observe | Analytics, Audit trail, Incidents, Evaluations, Scale & workers |
 | Configure | Integrations, Documents, Admin |
+| Learn | Help center |
 
 - Next to **Agents** there is a small arrow. Click it to expand a list of departments (Sales, Support, E-Commerce, Operations, Finance, Technology); each opens the Agents page filtered to that department.
 - At the bottom: a **Collapse** button that shrinks the sidebar to icons.
@@ -177,6 +178,7 @@ The demo tenant (`acme-demo`, "Acme Demo Co.") is filled with synthetic records.
 **Top bar.**
 - Your tenant's name and plan badge (this is where you see which tenant you are working in). A red **Emergency disable active** badge appears when an administrator has stopped all agents.
 - **Search or jump to…** box: opens the command palette (below).
+- **Help** (question-mark icon): opens the help article for the page you are on, or the Help center.
 - **Theme toggle** (sun/moon icon): switch between light and dark mode.
 - **Account menu** (your initials): shows your name, email and role badges, a **Workspace settings** link (opens Admin) and **Sign out**.
 
@@ -184,6 +186,13 @@ The demo tenant (`acme-demo`, "Acme Demo Co.") is filled with synthetic records.
 - **Actions**: **Ask Copilot…** (needs permission to run agents), **Start workflow** (needs permission to start workflows), **Toggle theme**, **Sign out**.
 - **Pages**: every page you can open, plus **Workflow definitions**.
 - **Agents**: every agent by name or department; select one to open its page.
+- **Help** (once you type something): matching help articles, plus **Search the help for "…"**.
+
+**Help center.** This guide and the technical documents, inside the dashboard. Open it from the sidebar (**Learn → Help center**), the question-mark icon or the command palette.
+- **Start with your role** offers a reading path for each audience: **Everyday users**, **Workspace admins**, **Developers & IT** and **Executives**. The path that matches your role is marked **Your role**; each path is a numbered sequence of articles with Previous / Next links.
+- The search box searches every article (try a task, a page name or a setting such as `GEMINI_API_KEY`). Results show where the words appear; the address bar keeps your search, so you can share the link.
+- **Configuration reference** lists every setting in `.env`, generated from `.env.example`, with common setups (Neon, Gemini, Claude, offline).
+- Articles about a dashboard page have an **Open <page>** button (shown only if your role can open that page).
 
 If you type a question, an **Ask Copilot: "…"** row appears at the bottom. Click it or press **Ctrl+Enter** to open the Copilot with your question already typed in. Press **Esc** to close the palette.
 

@@ -176,10 +176,11 @@ $nextBin = Join-Path $frontend "node_modules\next\dist\bin\next"
 $webLog = Join-Path $logDir "web.log"
 if (-not $Dev) {
   $buildId = Join-Path $frontend ".next\BUILD_ID"
-  $srcNewest = (Get-ChildItem -Recurse -File -Path (Join-Path $frontend "app"), (Join-Path $frontend "components"), (Join-Path $frontend "lib") | Sort-Object LastWriteTime -Descending | Select-Object -First 1).LastWriteTime
+  # docs\ feeds the in-app Help center, so a docs edit also triggers a rebuild.
+  $srcNewest = (Get-ChildItem -Recurse -File -Path (Join-Path $frontend "app"), (Join-Path $frontend "components"), (Join-Path $frontend "lib"), (Join-Path $root "docs") | Sort-Object LastWriteTime -Descending | Select-Object -First 1).LastWriteTime
   if (-not (Test-Path $buildId) -or (Get-Item $buildId).LastWriteTime -lt $srcNewest) {
     Say "  building the dashboard (about a minute)..."
-    Push-Location $frontend; & $node $nextBin build *> (Join-Path $logDir "build.log"); $code = $LASTEXITCODE; Pop-Location
+    Push-Location $frontend; & $node (Join-Path $frontend "scripts\build-help.mjs") *> (Join-Path $logDir "build.log"); & $node $nextBin build *>> (Join-Path $logDir "build.log"); $code = $LASTEXITCODE; Pop-Location
     if ($code -ne 0) { Get-Content (Join-Path $logDir "build.log") -Tail 40; Fail "dashboard build failed (log above)" }
   }
   $web = Start-Process -FilePath $node -ArgumentList $nextBin, "start", "-p", "$WebPort", "-H", "0.0.0.0" -WorkingDirectory $frontend -RedirectStandardOutput $webLog -RedirectStandardError "$webLog.err" -PassThru -WindowStyle Hidden
