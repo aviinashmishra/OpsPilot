@@ -21,8 +21,8 @@ frontend/.env.local
 
 # Local launcher state (logs, pids) and test artefacts (Playwright traces can contain session tokens)
 .run/
-e2e/test-results/
-e2e/playwright-report/
+test-results/
+playwright-report/
 .ruff_cache/
 *.tsbuildinfo
 .vercel/
