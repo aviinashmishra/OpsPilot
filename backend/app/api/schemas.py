@@ -179,6 +179,11 @@ class WorkflowDefinitionOut(BaseModel):
     is_active: bool
     timeout_seconds: int
     scope: str  # platform|tenant
+    schedule_enabled: bool | None = None  # None: the definition has no schedule trigger
+
+
+class ScheduleIn(BaseModel):
+    enabled: bool
 
 
 class WorkflowDefinitionIn(BaseModel):

@@ -230,6 +230,8 @@ export interface WorkflowDefinitionOut {
   is_active: boolean;
   timeout_seconds: number;
   scope: "platform" | "tenant";
+  /** null/undefined: no schedule trigger; otherwise whether it runs automatically in this workspace. */
+  schedule_enabled?: boolean | null;
 }
 
 export interface WorkflowStartIn {

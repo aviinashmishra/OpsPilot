@@ -71,6 +71,27 @@ use a separate Neon branch for production, or set the same `DEMO_PASSWORD` local
 If you use Vercel for the dashboard, delete the `opspilot-web` service in Render (or remove it
 from `render.yaml`).
 
+### 3. Scaling on Render (no code or config changes)
+
+Every OpsPilot process (API process or standalone worker) pulls jobs from the same database queue,
+so capacity grows by adding processes. Pick any of these, in order of cost:
+
+1. **More API processes per instance:** set `WEB_CONCURRENCY` (for example `2` to `4`) on
+   `opspilot-api`. Each process also runs job workers. Needs enough memory (about 300 MB each).
+2. **More instances:** raise the instance count of `opspilot-api` (paid plans; Render balances
+   traffic across them). Scheduled workflows, maintenance and audit sealing stay single-run
+   per period thanks to unique keys and database locks.
+3. **Dedicated workers:** add a Render **Background Worker** (paid) with the same repo,
+   `rootDir: backend`, the same environment variables as `opspilot-api`, and start command
+   `python -m app.workers.runner --concurrency 4`. Set `WORKER_MODE=db` on the API so job
+   execution moves entirely to the workers and the API only serves requests.
+4. **Database:** on Neon, enable autoscaling compute; use the pooled endpoint (`-pooler` host)
+   once total connections (see the table below) approach the plan limit.
+
+Keep production on its **own Neon branch** (Neon → Branches → Create), separate from any local
+or staging database: workers on a shared database would also execute the other environment's
+jobs.
+
 ## Production prerequisites (checked by `/health/ready`)
 
 | Requirement | Why |

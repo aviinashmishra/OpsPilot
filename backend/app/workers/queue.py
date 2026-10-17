@@ -89,7 +89,15 @@ def run_scheduled_maintenance() -> dict[str, int]:
         purged = apply_retention(db)
     with session_scope() as db:  # its own short transaction: sealing takes a per-tenant lock
         sealed = seal_all(db)
-    return {"approvals_expired": expired, "jobs_requeued": reaped["requeued"], "runs_recovered": len(recovered), "executions_reconciled": reconciled, "metrics_rows": metrics, "purged": purged, "audit_sealed": sealed}
+    scheduled = 0
+    try:
+        from app.services.schedules import run_due_schedules
+
+        with session_scope() as db:
+            scheduled = run_due_schedules(db)
+    except Exception:  # noqa: BLE001 - a scheduling problem must never stop housekeeping
+        log.exception("schedule.loop_failed")
+    return {"approvals_expired": expired, "jobs_requeued": reaped["requeued"], "runs_recovered": len(recovered), "executions_reconciled": reconciled, "metrics_rows": metrics, "purged": purged, "audit_sealed": sealed, "scheduled_runs": scheduled}
 
 
 _scheduler_thread: threading.Thread | None = None

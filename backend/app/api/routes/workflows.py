@@ -9,15 +9,23 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import Principal, require
-from app.api.schemas import Page, WorkflowDefinitionIn, WorkflowDefinitionOut, WorkflowRunOut, WorkflowStartIn
+from app.api.schemas import (
+    Page,
+    ScheduleIn,
+    WorkflowDefinitionIn,
+    WorkflowDefinitionOut,
+    WorkflowRunOut,
+    WorkflowStartIn,
+)
 from app.api.serializers import run_out
-from app.core.errors import Conflict, NotFound
+from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.ratelimit import check_rate_limit
 from app.core.security import canonical_hash
-from app.db.models import Approval, IdempotencyRecord, WorkflowDefinition, WorkflowRun
+from app.db.models import Approval, IdempotencyRecord, Tenant, WorkflowDefinition, WorkflowRun
 from app.db.session import get_db
-from app.orchestration.engine import execute_run, request_cancel, start_run, validate_graph
+from app.orchestration.engine import execute_run, load_definition, request_cancel, start_run, validate_graph
 from app.services.audit import record_audit
+from app.services.schedules import enabled_schedules, schedulable
 from app.workers.queue import enqueue_run
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
@@ -34,10 +42,13 @@ def _get_run(db: Session, principal: Principal, run_id: str) -> WorkflowRun:
     return run
 
 
-def _definition_out(d: WorkflowDefinition) -> WorkflowDefinitionOut:
+def _definition_out(d: WorkflowDefinition, tenant: Tenant | None = None) -> WorkflowDefinitionOut:
+    schedule_enabled = None
+    if schedulable(d) and tenant is not None:
+        schedule_enabled = enabled_schedules(tenant).get(d.key, False)
     return WorkflowDefinitionOut(
         id=str(d.id), key=d.key, name=d.name, description=d.description, version=d.version, graph=d.graph, trigger=d.trigger,
-        is_active=d.is_active, timeout_seconds=d.timeout_seconds, scope="tenant" if d.tenant_id else "platform",
+        is_active=d.is_active, timeout_seconds=d.timeout_seconds, scope="tenant" if d.tenant_id else "platform", schedule_enabled=schedule_enabled,
     )
 
 
@@ -94,7 +105,20 @@ def list_definitions(principal: Principal = Depends(require("workflows:read")), 
     rows = db.execute(
         select(WorkflowDefinition).where(or_(WorkflowDefinition.tenant_id.is_(None), WorkflowDefinition.tenant_id == principal.tenant.id)).order_by(WorkflowDefinition.key)
     ).scalars().all()
-    return [_definition_out(d) for d in rows]
+    return [_definition_out(d, principal.tenant) for d in rows]
+
+
+@router.put("/definitions/{key}/schedule", response_model=WorkflowDefinitionOut, summary="Turn a workflow's automatic schedule on or off for this workspace")
+def set_schedule(key: str, body: ScheduleIn, principal: Principal = Depends(require("workflows:admin")), db: Session = Depends(get_db)) -> WorkflowDefinitionOut:
+    definition = load_definition(db, principal.tenant.id, key)
+    if schedulable(definition) is None:
+        raise ValidationFailed(f"Workflow '{key}' has no schedule trigger")
+    tenant = db.get(Tenant, principal.tenant.id)
+    assert tenant is not None
+    tenant.settings = {**(tenant.settings or {}), "schedules": {**enabled_schedules(tenant), key: body.enabled}}
+    record_audit(db, tenant_id=tenant.id, action="workflow.schedule_enabled" if body.enabled else "workflow.schedule_disabled", resource_type="workflow_definition", resource_id=key, actor_id=principal.actor_id, details={"schedule": definition.trigger.get("schedule")})
+    db.commit()
+    return _definition_out(definition, tenant)
 
 
 @router.post("/definitions", response_model=WorkflowDefinitionOut, status_code=201, summary="Create or version a tenant workflow definition")
