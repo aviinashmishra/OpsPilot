@@ -22,9 +22,35 @@ export interface Page<T> {
 
 // --- Auth -------------------------------------------------------------------
 export interface LoginRequest {
-  tenant: string;
+  /** Workspace slug; optional when the email belongs to a single workspace. */
+  tenant?: string;
   email: string;
   password: string;
+}
+
+export interface SignupRequest {
+  company: string;
+  full_name: string;
+  email: string;
+  password: string;
+  sample_data: boolean;
+}
+
+export interface OnboardingStep {
+  key: string;
+  title: string;
+  description: string;
+  href: string;
+  done: boolean;
+}
+
+export interface OnboardingOut {
+  steps: OnboardingStep[];
+  done: number;
+  total: number;
+  complete: boolean;
+  ai: { available: boolean; configured: boolean; next_available_at: string | null };
+  sandbox: boolean;
 }
 
 export interface UserOut {

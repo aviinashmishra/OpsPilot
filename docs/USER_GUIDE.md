@@ -117,9 +117,11 @@ If port 3000 or 8000 is used by another program, the launcher picks the next fre
 
 1. Go to http://localhost:3000. You are sent to the **Sign in** page.
 2. If something is wrong with the API, a warning appears under the heading: a red box when the API cannot be reached (it tells you to run `start.cmd` or `scripts\doctor.ps1`), or a notice when it reports a degraded state. When everything is fine, no status is shown.
-3. Enter **Tenant** (your company's workspace id, for the demo `acme-demo`), **Email** and **Password**, then click **Sign in**.
+3. Enter your **Email** and **Password**, then click **Sign in**. OpsPilot finds your workspace from your email. Only if the same email and password belong to several workspaces does it ask for the **Workspace** (its id, for the demo `acme-demo`); you can also open that field yourself with **Sign in to a specific workspace**.
 
-On a development installation, a **Demo accounts** panel appears below the form. Click any account card to fill in the form, then click **Sign in**. All demo accounts use the password `OpsPilot-Demo-2026!` (local development only, never in production).
+**New company? Create a workspace.** Click **Create a workspace** under the sign-in form, enter your company name, your name, work email and a password (10+ characters with letters and numbers), and click **Create workspace**. You are signed in as the workspace admin straight away. Leave **Start with sample data** on (recommended): every system starts in sandbox mode filled with sample customers, orders, invoices and documents, so all 25 agents, every workflow and the Copilot work immediately. Connect your real systems later in **Integrations**. (Technical admins can turn self-serve sign-up off with `ALLOW_SIGNUP=false`.)
+
+On a development installation, a **Demo accounts** panel appears below the form. Click any account card to fill in the form, then click **Sign in**. All demo accounts use the password `OpsPilot-Demo-2026!` (local development only; deployments set their own `DEMO_PASSWORD`).
 
 | Demo account | Name | Role | In short, this person can... |
 |---|---|---|---|
@@ -298,6 +300,8 @@ More detail, good questions and limits: [Copilot guide](#8-copilot-guide).
 ### 4.2 Overview
 
 **What it is for:** a one-screen health check of the tenant. **Who:** everyone with `reports:read`.
+
+**Getting started** (admins, new workspaces): a checklist of six first steps: ask the Copilot a question, run an agent on sample data, start a workflow, review an approval, connect a real system, invite a teammate. Each step ticks itself when it has actually happened in the workspace; click a step to go there. Hide it with **×**; it also disappears once all six are done. A note says when agents are on sample data or when no AI model is available.
 
 At the top right, choose the period: **7d, 14d** (default), **30d** or **90d**.
 

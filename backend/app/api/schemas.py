@@ -36,9 +36,17 @@ class Page(BaseModel, Generic[T]):
 
 # --- Auth ------------------------------------------------------------------
 class LoginRequest(BaseModel):
-    tenant: str = Field(description="Tenant slug")
+    tenant: str | None = Field(default=None, description="Workspace (tenant slug); optional when the email belongs to one workspace")
     email: EmailStr
     password: str = Field(min_length=1, max_length=200)
+
+
+class SignupRequest(BaseModel):
+    company: str = Field(min_length=2, max_length=120, description="Company / workspace name")
+    full_name: str = Field(min_length=1, max_length=120)
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=200)
+    sample_data: bool = Field(default=True, description="Fill the sandbox with sample records so every agent works immediately")
 
 
 class TokenResponse(BaseModel):

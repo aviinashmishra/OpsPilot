@@ -46,16 +46,39 @@ def _iso(dt: datetime) -> str:
     return dt.isoformat()
 
 
+def default_tenant_settings() -> dict[str, Any]:
+    """Safe defaults for every new workspace: consequential actions need approval, nothing auto-runs
+    except posts to internal ops channels, and no savings are claimed until finance verifies them."""
+    return {
+        "policies": {"approval_mode": "standard", "amount_threshold": 1000, "separation_of_duties": True, "external_comms_require_approval": True, "approval_ttl_hours": 48, "auto_approve": [{"name": "internal-ops-chat", "tool": "chat.post_message", "conditions": {"channel_in": ["#ops", "#incidents", "#sales"]}}]},
+        "roi": {"loaded_hourly_cost_usd": 48.0, "infra_cost_per_run_usd": 0.002, "realization_rate": 0.0},
+    }
+
+
+def provision_workspace(db: Session, tenant: Tenant, *, now: datetime | None = None, sample_data: bool = True, with_documents: bool = True) -> None:
+    """Everything a workspace needs for every agent to work out of the box: system roles, a sandbox
+    connection for each of the 13 system families, and (optionally) sample business records and
+    knowledge-base documents for the sandbox to serve until real systems are connected. Idempotent."""
+    now = now or datetime.now(UTC)
+    ensure_system_roles(db, tenant.id)
+    for fam, meta in PROVIDER_FAMILIES.items():
+        if not db.execute(select(Integration).where(Integration.tenant_id == tenant.id, Integration.provider == fam)).scalar_one_or_none():
+            db.add(Integration(tenant_id=tenant.id, provider=fam, name=f"{meta['label']} (sandbox)", mode="mock", status="sandbox", config={}, scopes=[]))
+    db.flush()
+    if sample_data:
+        _seed_business_records(SandboxStore(db, str(tenant.id)), now)
+        if with_documents:
+            _seed_documents(db, tenant, now)
+    db.flush()
+
+
 def seed_demo(db: Session, *, now: datetime | None = None, with_documents: bool = True) -> Tenant:
     now = now or datetime.now(UTC)
     tenant = db.execute(select(Tenant).where(Tenant.slug == DEMO_TENANT_SLUG)).scalar_one_or_none()
     if tenant is None:
         tenant = Tenant(
             slug=DEMO_TENANT_SLUG, name="Acme Demo Co.", plan="growth", status="active",
-            settings={
-                "policies": {"approval_mode": "standard", "amount_threshold": 1000, "separation_of_duties": True, "external_comms_require_approval": True, "approval_ttl_hours": 48, "auto_approve": [{"name": "internal-ops-chat", "tool": "chat.post_message", "conditions": {"channel_in": ["#ops", "#incidents", "#sales"]}}]},
-                "roi": {"loaded_hourly_cost_usd": 48.0, "infra_cost_per_run_usd": 0.002, "realization_rate": 0.0},
-            },
+            settings=default_tenant_settings(),
             quotas={"monthly_workflow_runs": 5000, "monthly_llm_tokens": 5_000_000, "max_concurrent_runs": 25},
             feature_flags={"workflow_builder": True, "evaluations": True},
             retention_days=365,
@@ -72,14 +95,7 @@ def seed_demo(db: Session, *, now: datetime | None = None, with_documents: bool 
         elif not verify_password(password, user.hashed_password):
             user.hashed_password = hash_password(password)  # DEMO_PASSWORD changed: rotate
         user.roles = [roles[r] for r in u["roles"]]
-    for fam, meta in PROVIDER_FAMILIES.items():
-        if not db.execute(select(Integration).where(Integration.tenant_id == tenant.id, Integration.provider == fam)).scalar_one_or_none():
-            db.add(Integration(tenant_id=tenant.id, provider=fam, name=f"{meta['label']} (sandbox)", mode="mock", status="sandbox", config={}, scopes=[]))
-    db.flush()
-    _seed_business_records(SandboxStore(db, str(tenant.id)), now)
-    if with_documents:
-        _seed_documents(db, tenant, now)
-    db.flush()
+    provision_workspace(db, tenant, now=now, with_documents=with_documents)
     return tenant
 
 

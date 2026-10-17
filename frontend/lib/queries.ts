@@ -4,6 +4,7 @@ import { keepPreviousData, useQuery, type UseQueryOptions } from "@tanstack/reac
 
 import { api, type QueryParams } from "@/lib/api";
 import type {
+  OnboardingOut,
   AgentCatalogOut,
   AgentDetailOut,
   AgentRunOut,
@@ -195,8 +196,15 @@ export interface ApiHealthOut {
   version: string;
   database: string;
   llm_provider: string;
+  ai_available?: boolean;
+  ai_next_available_at?: string | null;
+  signup_enabled?: boolean;
   worker_mode: string;
   environment: string;
+}
+
+export function useOnboarding(opts?: Opts<OnboardingOut>) {
+  return useQuery<OnboardingOut, Error>({ queryKey: ["onboarding"], queryFn: () => api<OnboardingOut>("/onboarding"), staleTime: 30_000, ...opts });
 }
 
 /** Polls the public API status so the UI can explain outages instead of failing silently. */

@@ -139,13 +139,14 @@ def create_app() -> FastAPI:
         evaluations,
         events,
         integrations,
+        onboarding,
         reports,
         tasks,
         tools_admin,
         workflows,
     )
 
-    for r in (auth.router, events.router, workflows.router, agents.router, tasks.router, approvals.router, integrations.router, reports.router, documents.router, evaluations.router, admin.router, copilot.router, tools_admin.router):
+    for r in (auth.router, events.router, workflows.router, agents.router, tasks.router, approvals.router, integrations.router, reports.router, documents.router, evaluations.router, admin.router, copilot.router, tools_admin.router, onboarding.router):
         app.include_router(r, prefix=s.api_prefix)
 
     from app.mcp_server import mount_mcp
@@ -164,7 +165,7 @@ def create_app() -> FastAPI:
         from app.llm.gateway import get_gateway
 
         ai = get_gateway().ai_status()
-        return {"status": "ok" if db_ok else "degraded", "version": __version__, "database": "ok" if db_ok else "unreachable", "llm_provider": cfg.effective_llm_provider, "ai_available": ai["available"], "ai_next_available_at": ai["next_available_at"], "worker_mode": cfg.worker_mode, "environment": cfg.app_env}
+        return {"status": "ok" if db_ok else "degraded", "version": __version__, "database": "ok" if db_ok else "unreachable", "llm_provider": cfg.effective_llm_provider, "ai_available": ai["available"], "ai_next_available_at": ai["next_available_at"], "signup_enabled": cfg.allow_signup and cfg.allow_password_login, "worker_mode": cfg.worker_mode, "environment": cfg.app_env}
 
     @app.get("/health/live", tags=["health"], summary="Liveness probe")
     def live() -> dict[str, Any]:

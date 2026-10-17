@@ -2,6 +2,7 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { ArrowRight, Eye, EyeOff, ShieldCheck, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
@@ -12,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { InlineError } from "@/components/ui/states";
-import { api, errorMessage } from "@/lib/api";
+import { api, ApiError, errorMessage } from "@/lib/api";
 import { useApiHealth, useDemoAccounts } from "@/lib/queries";
 import { isSessionValid, useSession } from "@/lib/session";
 import type { LoginRequest, TokenResponse } from "@/lib/types";
@@ -56,8 +57,10 @@ function LoginForm() {
   const expiresAt = useSession((s) => s.expiresAt);
   const setSession = useSession((s) => s.setSession);
   const demo = useDemoAccounts();
+  const health = useApiHealth();
 
   const [tenant, setTenant] = useState("");
+  const [showWorkspace, setShowWorkspace] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -66,10 +69,6 @@ function LoginForm() {
     if (hydrated && isSessionValid({ token, expiresAt })) router.replace(next);
   }, [hydrated, token, expiresAt, router, next]);
 
-  useEffect(() => {
-    if (demo.data?.tenant && !tenant) setTenant(demo.data.tenant);
-  }, [demo.data, tenant]);
-
   const login = useMutation({
     mutationFn: (body: LoginRequest) => api<TokenResponse>("/auth/login", { method: "POST", body, auth: false }),
     onSuccess: (response) => {
@@ -77,15 +76,18 @@ function LoginForm() {
       toast.success(`Welcome back, ${response.user.full_name.split(" ")[0]}`);
       router.replace(next);
     },
+    onError: (error) => {
+      // The email belongs to several workspaces: ask which one.
+      if (error instanceof ApiError && error.details?.field === "tenant") setShowWorkspace(true);
+    },
   });
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    login.mutate({ tenant: tenant.trim(), email: email.trim(), password });
+    login.mutate({ ...(showWorkspace && tenant.trim() ? { tenant: tenant.trim() } : {}), email: email.trim(), password });
   };
 
   const fill = (account: { email: string }) => {
-    setTenant(demo.data?.tenant ?? tenant);
     setEmail(account.email);
     if (demo.data?.password) setPassword(demo.data.password);
     else document.getElementById("password")?.focus();
@@ -106,9 +108,6 @@ function LoginForm() {
           </p>
         ) : null}
         <form onSubmit={submit} className="mt-6 space-y-4" noValidate>
-          <Field label="Tenant" htmlFor="tenant" required>
-            <Input id="tenant" value={tenant} onChange={(e) => setTenant(e.target.value)} placeholder="acme-demo" autoComplete="organization" required />
-          </Field>
           <Field label="Email" htmlFor="email" required>
             <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" autoComplete="username" required />
           </Field>
@@ -120,11 +119,29 @@ function LoginForm() {
               </button>
             </div>
           </Field>
+          {showWorkspace ? (
+            <Field label="Workspace" htmlFor="tenant" hint="Shown in your invitation or in the top bar after you sign in.">
+              <Input id="tenant" value={tenant} onChange={(e) => setTenant(e.target.value)} placeholder="your-company" autoComplete="organization" />
+            </Field>
+          ) : null}
           {login.isError ? <InlineError error={login.error} /> : null}
-          <Button type="submit" variant="primary" size="lg" className="w-full" loading={login.isPending} disabled={!tenant || !email || !password} rightIcon={<ArrowRight className="h-4 w-4" aria-hidden />}>
+          <Button type="submit" variant="primary" size="lg" className="w-full" loading={login.isPending} disabled={!email || !password} rightIcon={<ArrowRight className="h-4 w-4" aria-hidden />}>
             Sign in
           </Button>
+          {!showWorkspace ? (
+            <button type="button" onClick={() => setShowWorkspace(true)} className="w-full text-center text-xs text-fg-subtle hover:text-fg">
+              Sign in to a specific workspace
+            </button>
+          ) : null}
         </form>
+        {health.data?.signup_enabled ? (
+          <p className="mt-5 border-t border-border pt-4 text-center text-sm text-fg-muted">
+            New to OpsPilot?{" "}
+            <Link href="/signup" className="font-medium text-accent hover:underline">
+              Create a workspace
+            </Link>
+          </p>
+        ) : null}
       </div>
 
       {demo.data && demo.data.accounts.length > 0 ? (

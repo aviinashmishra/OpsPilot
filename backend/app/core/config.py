@@ -65,6 +65,7 @@ class Settings(BaseSettings):
     oidc_audience: str | None = None
     oidc_jwks_url: str | None = None
     allow_password_login: bool = True  # local dev issuer; disable when OIDC is configured
+    allow_signup: bool = True  # self-serve "Create a workspace" for new companies
     webhook_signing_secret: str | None = Field(None, repr=False)
     # Password for the seeded demo accounts. Unset = the public local-dev default (shown on the login
     # page). Set it on any internet-facing deployment; re-running the seed rotates existing accounts.

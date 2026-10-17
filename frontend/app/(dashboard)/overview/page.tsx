@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { DailyRunsChart } from "@/components/charts/daily-runs-chart";
 import { DepartmentBars } from "@/components/charts/department-bars";
+import { GettingStarted } from "@/components/overview/getting-started";
 import { Badge, StatusPill } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardToolbar } from "@/components/ui/card";
@@ -39,6 +40,8 @@ export default function OverviewPage() {
         title={`Good ${greeting()}, ${user?.full_name.split(" ")[0] ?? "there"}`}
         actions={<Segmented aria-label="Period" value={days} onChange={setDays} options={PERIOD_OPTIONS.map((d) => ({ value: d, label: `${d}d` }))} />}
       />
+
+      <GettingStarted />
 
       {overview.isError ? <ErrorState error={overview.error} onRetry={() => overview.refetch()} /> : null}
 
