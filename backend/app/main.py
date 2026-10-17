@@ -161,7 +161,10 @@ def create_app() -> FastAPI:
         except Exception:  # noqa: BLE001
             db_ok = False
         cfg = get_settings()
-        return {"status": "ok" if db_ok else "degraded", "version": __version__, "database": "ok" if db_ok else "unreachable", "llm_provider": cfg.effective_llm_provider, "worker_mode": cfg.worker_mode, "environment": cfg.app_env}
+        from app.llm.gateway import get_gateway
+
+        ai = get_gateway().ai_status()
+        return {"status": "ok" if db_ok else "degraded", "version": __version__, "database": "ok" if db_ok else "unreachable", "llm_provider": cfg.effective_llm_provider, "ai_available": ai["available"], "ai_next_available_at": ai["next_available_at"], "worker_mode": cfg.worker_mode, "environment": cfg.app_env}
 
     @app.get("/health/live", tags=["health"], summary="Liveness probe")
     def live() -> dict[str, Any]:

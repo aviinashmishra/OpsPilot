@@ -136,6 +136,8 @@ def test_error_mapping_and_safety_blocks():
 def test_real_sdk_clients_construct_offline(name, key_field, cls):
     """Catches SDK/httpx pin drift (e.g. openai<1.55 passing `proxies` to httpx 0.28) without any network call."""
     provider = g.build_provider(Settings(_env_file=None, llm_provider=name, **{key_field: "test-key"}))
+    if provider.name == "failover":  # Gemini adds its fallback models as extra routes by default
+        provider = provider.primary.provider
     assert isinstance(provider, cls) and provider.name == name
 
 

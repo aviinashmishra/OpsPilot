@@ -103,10 +103,10 @@ function MessageFooter({ message }: { message: CopilotMessageOut }) {
             {live}{message.model ? ` · ${message.model}` : ""}
           </Badge>
         ) : (
-          <Tip content="No LLM API key is configured, so a deterministic planner routes the request to tools.">
+          <Tip content="No AI model was available (no key, quota or outage), so the built-in planner routed this request to tools.">
             <span>
               <Badge size="sm" icon={<Cpu className="h-3 w-3" aria-hidden />}>
-                Offline planner
+                Built-in planner
               </Badge>
             </span>
           </Tip>

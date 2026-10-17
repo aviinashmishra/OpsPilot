@@ -768,7 +768,25 @@ export interface DocumentSearchOut {
 }
 
 // --- Ops Copilot ---------------------------------------------------------------------------
-export type CopilotMode = "claude" | "gemini" | "offline_planner";
+export type CopilotMode = "claude" | "gemini" | "openai" | "offline_planner";
+
+export interface AiRouteStatus {
+  provider: string;
+  model: string;
+  fast_model: string;
+  tools: boolean;
+  state: "ready" | "cooling";
+  until: string | null;
+  reason: string | null;
+}
+
+/** Availability of the AI routes (primary model, fallback models, other providers). */
+export interface AiStatus {
+  available: boolean;
+  active: { provider: string; model: string } | null;
+  next_available_at: string | null;
+  routes: AiRouteStatus[];
+}
 export type CopilotToolKind = "agent" | "tool" | "custom" | "platform";
 export type CopilotMessageStatus = "pending" | "running" | "done" | "failed";
 export type CopilotStepStatus = "running" | "ok" | "error" | "needs_approval";
@@ -787,6 +805,7 @@ export interface CopilotStatusOut {
   tool_counts: Partial<Record<CopilotToolKind, number>> & Record<string, number | undefined>;
   tools: CopilotToolInfo[];
   suggestions: string[];
+  ai?: AiStatus;
 }
 
 export interface CopilotStepOut {

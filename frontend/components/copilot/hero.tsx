@@ -11,10 +11,11 @@ import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, Dia
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { InlineError } from "@/components/ui/states";
+import { Tip } from "@/components/ui/tooltip";
 import type { CopilotStatusOut } from "@/lib/types";
 import { cn, copilotModelLabel, fmtInt } from "@/lib/utils";
 
-export function CopilotModeBadge({ status, compact }: { status: CopilotStatusOut | undefined; compact?: boolean }) {
+export function CopilotModeBadge({ status }: { status: CopilotStatusOut | undefined; compact?: boolean }) {
   if (!status) return null;
   const live = copilotModelLabel(status.mode);
   if (live) {
@@ -24,11 +25,16 @@ export function CopilotModeBadge({ status, compact }: { status: CopilotStatusOut
       </Badge>
     );
   }
+  const paused = Boolean(status.ai && status.ai.routes.length > 0 && !status.ai.available);
+  const back = status.ai?.next_available_at ? new Date(status.ai.next_available_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null;
   return (
-    <span className="inline-flex flex-wrap items-center justify-center gap-1.5" data-testid="copilot-mode">
-      <Badge icon={<Cpu className="h-3 w-3" aria-hidden />}>Offline planner</Badge>
-      {!compact ? <span className="text-xs text-fg-subtle">— no API key; deterministic tool routing</span> : null}
-    </span>
+    <Tip content={paused ? `Every AI model is at its limit or busy${back ? `; back around ${back}` : ""}. Answers use the built-in planner until then.` : "No AI key is configured, so a built-in planner routes requests to tools."}>
+      <span className="inline-flex flex-wrap items-center justify-center gap-1.5" data-testid="copilot-mode">
+        <Badge tone={paused ? "warning" : "neutral"} icon={<Cpu className="h-3 w-3" aria-hidden />}>
+          {paused ? `AI paused${back ? ` · back ${back}` : ""}` : "Built-in planner"}
+        </Badge>
+      </span>
+    </Tip>
   );
 }
 

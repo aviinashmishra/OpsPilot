@@ -178,5 +178,5 @@ export function expiresIn(value: string | null | undefined): { text: string; exp
 /** Model family behind a live Copilot mode ("Claude", "Gemini"), or null for the offline planner. */
 export function copilotModelLabel(mode: string | null | undefined): string | null {
   if (!mode || mode === "offline_planner") return null;
-  return mode === "claude" ? "Claude" : mode === "gemini" ? "Gemini" : mode;
+  return mode === "claude" ? "Claude" : mode === "gemini" ? "Gemini" : mode === "openai" ? "OpenAI" : mode;
 }

@@ -1149,7 +1149,7 @@ The Copilot never approves anything, and cannot. When an agent it called propose
 - The offline planner makes at most 4 calls per message.
 - Messages are refused when the tenant's monthly workflow-run quota is used up, and are rate-limited per tenant.
 - The Copilot is for signed-in users only. External programs use the MCP endpoint instead.
-- Temporary provider errors (rate limit 429, overloaded 503) are retried a few times automatically. If the AI provider keeps failing or is out of quota, the answer fails (see [Troubleshooting](#ai-provider-errors-quota-429-or-overloaded-503)).
+- If the AI model is busy or out of quota, the Copilot switches to the next available model automatically. If no AI model is available at all, it answers with the built-in planner and adds a note saying so (see [Troubleshooting](#ai-provider-errors-quota-429-or-overloaded-503)).
 
 ---
 
@@ -1322,16 +1322,13 @@ To stop just one agent, disable it on the Agents page instead.
 
 ### AI provider errors (quota 429 or overloaded 503)
 
-When the AI provider rejects requests (for example an exhausted free-tier quota, HTTP 429) or is overloaded (HTTP 503):
-- **Agents keep working.** Each AI call is retried a few times; if it still fails, the agent uses its built-in deterministic logic. The run's **Model** shows `heuristic-fallback` and a warning says "LLM call for '…' failed (…); deterministic fallback used". The result is still valid and evidence-based, but less nuanced (for example plainer wording, simpler extraction). Workflows and bulk runs continue.
-- **The Copilot answer fails** after a few automatic retries, showing "The Copilot couldn't finish this request" with an error such as `LLMError: Gemini API error 429: …`. Use **Retry** later. Overload errors (503) are usually temporary.
-- **Evaluations** measure the fallback logic instead of the model (see Recipe 8).
-- Ask a technical admin to raise the provider quota, change the provider, or switch to the offline mode (see the appendix), in which the Copilot uses the offline planner.
+OpsPilot keeps a chain of AI models: your main model, then the other Gemini models (each has its own free daily allowance), then Claude and OpenAI if their keys are configured. When a model is out of quota (HTTP 429) or overloaded (HTTP 503):
+- **The next model takes over immediately.** A model out of quota rests until its quota resets (the provider tells OpsPilot when); an overloaded one rests for 30 seconds. Nothing waits on a model that is known to be down.
+- **If every model is resting, agents keep working** with their built-in deterministic logic. The run's **Model** shows `heuristic-fallback` and a warning says so. Results are still valid and evidence-based, just less nuanced. Workflows and bulk runs continue.
+- **The Copilot keeps answering** with its built-in planner. The header badge shows **AI paused · back HH:MM**, and the answer ends with a note that the AI model was unavailable.
+- **Evaluations** run during that time measure the built-in logic, not the model (see Recipe 8).
 
-**Gemini free tier.** On the Gemini free tier, `gemini-3.6-flash` allows only about 20 requests per day, and one Copilot answer or agent run can use several. Once the daily allowance is used up:
-- agents (Playground, bulk runs, workflows, evaluations) keep working with the deterministic `heuristic-fallback` logic;
-- each Copilot turn retries the 429 (and any transient 503) a few times automatically and then fails;
-- this lasts until the quota resets (daily) or billing is enabled on the Google AI Studio project.
+**Gemini free tier.** Each Gemini model allows about 20 requests per day, and one Copilot answer or agent run can use several. With the default chain of three Gemini models you get roughly three times that. For steady use, enable billing on the Google AI Studio project or add an `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` as automatic backup (see the appendix).
 
 ### Pages are slow
 
@@ -1442,12 +1439,12 @@ This appendix is for the people who install and configure OpsPilot. Everyday use
 ### LLM provider settings
 
 Configured in the `.env` file in the project folder (restart with `stop.cmd` then `start.cmd` after changes):
-- `LLM_PROVIDER`: `mock` (no AI; agents use their deterministic logic and the Copilot uses the offline planner), `anthropic`, `openai` or `gemini`, with the matching `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY`. A provider without its key silently falls back to `mock`.
-- `LLM_DEFAULT_MODEL` and `LLM_FAST_MODEL` must be model ids of the chosen provider (for Gemini they must start with `gemini`).
-- `COPILOT_MAX_ITERATIONS` (default 8) and `COPILOT_MAX_TOOL_CALLS` (default 24) bound each Copilot answer.
-- When the Gemini quota is exhausted, setting `LLM_PROVIDER=mock` keeps the dashboard fully usable offline (Copilot in offline-planner mode) until quota is available again. Start new Copilot chats after switching provider.
+- `LLM_PROVIDER`: `auto` (default: the first key found, in the order Gemini, Anthropic, OpenAI), `gemini`, `anthropic`, `openai`, or `mock` (no AI; agents use their deterministic logic and the Copilot its built-in planner). Keys: `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`. With no key at all, everything still works on built-in logic.
+- **Automatic failover.** Every other provider that has a key becomes a backup (`LLM_FALLBACK_PROVIDERS=auto`; set `none` to disable, or a list such as `anthropic,openai`). For Gemini, `GEMINI_FALLBACK_MODELS` (default `gemini-3.8-flash,gemini-3.5-flash-lite`) adds more models with their own free quotas.
+- `LLM_DEFAULT_MODEL` and `LLM_FAST_MODEL` set the main provider's models. Backup providers use `GEMINI_MODEL`, `ANTHROPIC_MODEL` / `ANTHROPIC_FAST_MODEL` and `OPENAI_MODEL` / `OPENAI_FAST_MODEL`.
+- `COPILOT_MAX_ITERATIONS` (default 8) and `COPILOT_MAX_TOOL_CALLS` (default 24) bound each Copilot answer. The Copilot needs a provider with tool calling (Gemini or Claude); OpenAI is used for agents only.
 
-`GET /api/v1/health` and the Copilot's mode badge show the provider in use. See [LIMITATIONS.md](LIMITATIONS.md) for what has and has not been verified against real providers.
+`GET /api/v1/health` shows whether any AI model is available (`ai_available`, `ai_next_available_at`), and the Copilot status (`GET /api/v1/copilot/status` → `ai`) lists every route with its state. See [LIMITATIONS.md](LIMITATIONS.md) for what has and has not been verified against real providers.
 
 ### API keys, events and webhooks
 

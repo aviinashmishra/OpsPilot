@@ -101,10 +101,13 @@ def copilot_status(principal: Principal = Depends(require("agents:run")), db: Se
     counts: dict[str, int] = {}
     for t in tools:
         counts[t.kind] = counts.get(t.kind, 0) + 1
+    ai = gw.ai_status()
+    mode = gw.copilot_mode
     return {
-        "mode": gw.copilot_mode,
-        "model": None if gw.copilot_mode == "offline_planner" else gw.resolve_model("default"),
-        "provider": gw.provider.name,
+        "mode": mode,
+        "model": None if mode == "offline_planner" else ((ai.get("active") or {}).get("model") or gw.resolve_model("default")),
+        "provider": (ai.get("active") or {}).get("provider") or gw.provider.name,
+        "ai": ai,
         "tool_counts": counts,
         "tools": [{"name": t.name, "kind": t.kind, "label": t.label, "description": t.description[:300]} for t in tools],
         "suggestions": [

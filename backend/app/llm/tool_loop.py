@@ -161,6 +161,8 @@ def run_tool_loop(
     create = getattr(gateway.provider, "create_with_tools", None)
     if gateway.is_mock or create is None:
         return _run_offline(user_text, by_name, observer, planner, max_iterations, max_tool_calls)
+    if gateway.copilot_mode == "offline_planner":  # every AI route is cooling (quota / outage)
+        return _run_offline(user_text, by_name, observer, planner, max_iterations, max_tool_calls, [AI_UNAVAILABLE_WARNING])
 
     resolved_model = model or gateway.resolve_model("default")
     messages: list[dict[str, Any]] = list(history) + [{"role": "user", "content": user_text}]
@@ -171,8 +173,16 @@ def run_tool_loop(
     warnings: list[str] = []
     stop_reason = "end_turn"
     text = ""
+    last_model: str | None = None
     for iteration in range(1, max_iterations + 1):
-        msg = _create_with_retry(create, model=resolved_model, system=system, messages=messages, tools=definitions, max_tokens=16000, timeout=s.llm_timeout_seconds * 3, effort=effort or s.copilot_effort)
+        try:
+            msg = _create_with_retry(create, model=resolved_model, system=system, messages=messages, tools=definitions, max_tokens=16000, timeout=s.llm_timeout_seconds * 3, effort=effort or s.copilot_effort)
+        except LLMError:
+            if calls == 0:  # nothing executed yet: answer with the deterministic planner instead of failing
+                log.warning("tool_loop.offline_fallback", iteration=iteration)
+                return _run_offline(user_text, by_name, observer, planner, max_iterations, max_tool_calls, [AI_UNAVAILABLE_WARNING])
+            raise
+        last_model = msg.model
         u = msg.usage
         usage["calls"] += 1
         usage["input_tokens"] += u.input_tokens or 0
@@ -207,10 +217,10 @@ def run_tool_loop(
             text = text or "I reached the step limit for one request. The tool results gathered so far are shown above."
     if not text:
         text = "Done." if stop_reason == "end_turn" else "I could not complete this request."
-    return LoopResult(text=text, new_history=messages[turn_start:], mode=gateway.copilot_mode, model=resolved_model, stop_reason=stop_reason, iterations=usage["calls"], tool_calls=calls, usage=usage, warnings=warnings)
+    return LoopResult(text=text, new_history=messages[turn_start:], mode=gateway.copilot_mode, model=last_model or resolved_model, stop_reason=stop_reason, iterations=usage["calls"], tool_calls=calls, usage=usage, warnings=warnings)
 
 
-def _run_offline(user_text: str, by_name: dict[str, LoopTool], observer: StepObserver, planner: Planner, max_iterations: int, max_tool_calls: int) -> LoopResult:
+def _run_offline(user_text: str, by_name: dict[str, LoopTool], observer: StepObserver, planner: Planner, max_iterations: int, max_tool_calls: int, warnings: list[str] | None = None) -> LoopResult:
     done: list[tuple[PlannedCall, ToolOutcome]] = []
     iterations = 0
     for iteration in range(1, max_iterations + 1):
@@ -225,7 +235,10 @@ def _run_offline(user_text: str, by_name: dict[str, LoopTool], observer: StepObs
             done.append((call, outcome))
     text = planner.answer(user_text, done)
     history = [{"role": "user", "content": user_text}, {"role": "assistant", "content": text}]
-    return LoopResult(text=text, new_history=history, mode="offline_planner", model=None, stop_reason="end_turn", iterations=iterations, tool_calls=len(done), usage={"calls": 0, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0})
+    return LoopResult(text=text, new_history=history, mode="offline_planner", model=None, stop_reason="end_turn", iterations=iterations, tool_calls=len(done), usage={"calls": 0, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0}, warnings=list(warnings or []))
+
+
+AI_UNAVAILABLE_WARNING = "The AI model is unavailable right now (quota or outage); answered with the built-in planner."
 
 
 def new_call_id() -> str:

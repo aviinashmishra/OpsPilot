@@ -74,7 +74,20 @@ class Settings(BaseSettings):
     data_retention_days_default: int = 365
 
     # --- LLM -------------------------------------------------------------
-    llm_provider: Literal["mock", "anthropic", "openai", "gemini"] = "mock"
+    # "auto" = the first provider with an API key (gemini, anthropic, openai), else the offline mock.
+    llm_provider: Literal["auto", "mock", "anthropic", "openai", "gemini"] = "auto"
+    # Providers tried, in order, when the primary is rate-limited, out of quota or down.
+    # "auto" = every other provider that has an API key; "none" = no cross-provider failover.
+    llm_fallback_providers: str = "auto"
+    # Extra Gemini models tried after the primary Gemini model. On the free tier every model has
+    # its own daily quota, so this multiplies the free capacity. Empty = none.
+    gemini_fallback_models: str = "gemini-3.8-flash,gemini-3.5-flash-lite"
+    # Models used when a provider is not the primary (the primary uses LLM_DEFAULT/FAST_MODEL).
+    gemini_model: str = "gemini-3.6-flash"
+    anthropic_model: str = "claude-sonnet-5-5"
+    anthropic_fast_model: str = "claude-haiku-5-5"
+    openai_model: str = "gpt-4o"
+    openai_fast_model: str = "gpt-4o-mini"
     anthropic_api_key: str | None = Field(None, repr=False)
     openai_api_key: str | None = Field(None, repr=False)
     gemini_api_key: str | None = Field(None, repr=False)  # Google AI Studio key (Gemini Developer API)
@@ -153,10 +166,38 @@ class Settings(BaseSettings):
         return self.database_url.startswith("sqlite")
 
     @property
+    def llm_keys(self) -> dict[str, str | None]:
+        return {"gemini": self.gemini_api_key, "anthropic": self.anthropic_api_key, "openai": self.openai_api_key}
+
+    @property
     def effective_llm_provider(self) -> str:
-        """The provider actually in use: a provider without its API key falls back to the mock."""
-        keys = {"anthropic": self.anthropic_api_key, "openai": self.openai_api_key, "gemini": self.gemini_api_key}
-        return self.llm_provider if keys.get(self.llm_provider) else "mock"
+        """The primary provider actually in use: one without its API key falls back to the mock."""
+        if self.llm_provider == "auto":
+            return next((p for p, k in self.llm_keys.items() if k), "mock")
+        return self.llm_provider if self.llm_keys.get(self.llm_provider) else "mock"
+
+    @property
+    def llm_fallback_list(self) -> list[str]:
+        """Cross-provider failover order (providers with a key, excluding the primary)."""
+        primary = self.effective_llm_provider
+        raw = self.llm_fallback_providers.strip().lower()
+        if raw in {"none", "off", ""}:
+            return []
+        wanted = list(self.llm_keys) if raw == "auto" else [p.strip() for p in raw.split(",") if p.strip()]
+        return [p for p in wanted if p != primary and self.llm_keys.get(p)]
+
+    def models_for(self, provider: str) -> tuple[str, str]:
+        """(default, fast) model ids for a provider. The primary uses LLM_DEFAULT_MODEL/LLM_FAST_MODEL
+        when they belong to that provider's family; otherwise the per-provider defaults apply."""
+        family = {"gemini": "gemini", "anthropic": "claude", "openai": "gpt"}.get(provider, "")
+        if provider == self.effective_llm_provider and self.llm_default_model.startswith(family):
+            fast = self.llm_fast_model if self.llm_fast_model.startswith(family) else self.llm_default_model
+            return self.llm_default_model, fast
+        return {
+            "gemini": (self.gemini_model, self.gemini_model),
+            "anthropic": (self.anthropic_model, self.anthropic_fast_model),
+            "openai": (self.openai_model, self.openai_fast_model),
+        }.get(provider, (self.llm_default_model, self.llm_fast_model))
 
     @property
     def is_transaction_pooler(self) -> bool:
@@ -181,6 +222,8 @@ class Settings(BaseSettings):
             problems.append("LLM_PROVIDER=anthropic requires ANTHROPIC_API_KEY")
         if self.llm_provider == "openai" and not self.openai_api_key:
             problems.append("LLM_PROVIDER=openai requires OPENAI_API_KEY")
+        if self.llm_provider == "auto" and self.effective_llm_provider == "mock":
+            problems.append("LLM_PROVIDER=auto but no AI key is set (GEMINI_API_KEY, ANTHROPIC_API_KEY or OPENAI_API_KEY); agents use built-in logic")
         if self.llm_provider == "gemini":
             if not self.gemini_api_key:
                 problems.append("LLM_PROVIDER=gemini requires GEMINI_API_KEY")

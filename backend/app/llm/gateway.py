@@ -64,6 +64,26 @@ def approx_tokens(text: str) -> int:
     return max(1, len(text) // 4)
 
 
+_RETRY_IN = re.compile(r"retry in\s+(?:(\d+)h)?\s*(?:(\d+)m(?!s))?\s*(?:([\d.]+)s)?", re.I)
+
+
+def retry_after_seconds(message: str) -> float | None:
+    """Parse "Please retry in 13h8m51.8s" / "retry in 37s" from a provider error message."""
+    m = _RETRY_IN.search(message or "")
+    if not m or not any(m.groups()):
+        return None
+    hours, minutes, seconds = (float(g) if g else 0.0 for g in m.groups())
+    return hours * 3600 + minutes * 60 + seconds
+
+
+def _header_retry_after(exc: Any) -> float | None:
+    try:
+        value = exc.response.headers.get("retry-after")
+        return float(value) if value else None
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
 @dataclass
 class ProviderResponse:
     text: str
@@ -198,7 +218,7 @@ class AnthropicProvider:
     def _map_error(self, exc: Exception) -> Exception:
         a = self._anthropic
         if isinstance(exc, a.RateLimitError):
-            return LLMError("Anthropic rate limit", details={"provider": "anthropic", "status": 429})
+            return LLMError("Anthropic rate limit", details={"provider": "anthropic", "status": 429, "retry_after_s": _header_retry_after(exc)})
         if isinstance(exc, a.BadRequestError):
             err = LLMError(f"Anthropic rejected the request: {getattr(exc, 'message', exc)}", details={"provider": "anthropic", "status": 400})
             err.retryable = False
@@ -306,7 +326,7 @@ class OpenAIProvider:
                 response_format={"type": "json_object"} if json_mode else None,  # type: ignore[arg-type]
             )
         except openai.RateLimitError as exc:
-            raise LLMError("OpenAI rate limit", details={"provider": "openai"}) from exc
+            raise LLMError("OpenAI rate limit", details={"provider": "openai", "status": 429, "retry_after_s": _header_retry_after(exc)}) from exc
         except openai.APIStatusError as exc:
             err = LLMError(f"OpenAI API error: {exc.status_code}", details={"provider": "openai"})
             err.retryable = exc.status_code >= 500
@@ -395,7 +415,12 @@ class GeminiProvider:
     @staticmethod
     def _map_error(exc: Any) -> LLMError:
         code = getattr(exc, "code", None) or 0
-        err = LLMError(f"Gemini API error {code}: {getattr(exc, 'message', None) or exc}"[:500], details={"provider": "gemini", "status": code})
+        details: dict[str, Any] = {"provider": "gemini", "status": code}
+        full = str(exc)  # parsed before truncation: the "retry in ..." hint sits at the end
+        if code == 429:
+            details["retry_after_s"] = retry_after_seconds(full)
+            details["daily_quota"] = "per_day" in full.lower() or "free_tier_requests" in full.lower()
+        err = LLMError(f"Gemini API error {code}: {getattr(exc, 'message', None) or exc}"[:500], details=details)
         err.retryable = code == 429 or code >= 500 or code in {408, 409}
         return err
 
@@ -517,17 +542,44 @@ class GeminiProvider:
         return {"error" if block.get("is_error") else "output": value}
 
 
+def _make_provider(name: str, s: Settings) -> Any:
+    if name == "anthropic":
+        return AnthropicProvider(s.anthropic_api_key or "", enable_fallbacks=s.llm_enable_fallbacks)
+    if name == "openai":
+        return OpenAIProvider(s.openai_api_key or "")
+    return GeminiProvider(s.gemini_api_key or "")
+
+
+def build_routes(s: Settings) -> list[Any]:
+    """Primary route first, then extra Gemini models, then the other keyed providers."""
+    from app.llm.failover import Route
+
+    primary = s.effective_llm_provider
+    if primary == "mock":
+        return []
+    routes: list[Route] = []
+    for name in [primary, *s.llm_fallback_list]:
+        provider = _make_provider(name, s)
+        default, fast = s.models_for(name)
+        routes.append(Route(provider, default, fast))
+        if name == "gemini":
+            for extra in (m.strip() for m in s.gemini_fallback_models.split(",")):
+                if extra and extra not in (default, fast):
+                    routes.append(Route(provider, extra, extra))
+    return routes
+
+
 def build_provider(settings: Settings | None = None) -> LLMProvider:
+    """A single provider, a FailoverProvider over several routes, or the offline mock."""
+    from app.llm.failover import FailoverProvider
+
     s = settings or get_settings()
-    if s.llm_provider == "anthropic" and s.anthropic_api_key:
-        return AnthropicProvider(s.anthropic_api_key, enable_fallbacks=s.llm_enable_fallbacks)
-    if s.llm_provider == "openai" and s.openai_api_key:
-        return OpenAIProvider(s.openai_api_key)
-    if s.llm_provider == "gemini" and s.gemini_api_key:
-        return GeminiProvider(s.gemini_api_key)
-    if s.llm_provider != "mock":
-        log.warning("llm.provider_unconfigured", provider=s.llm_provider, fallback="mock")
-    return MockProvider()
+    routes = build_routes(s)
+    if not routes:
+        if s.llm_provider != "mock":
+            log.warning("llm.provider_unconfigured", provider=s.llm_provider, fallback="mock")
+        return MockProvider()
+    return routes[0].provider if len(routes) == 1 else FailoverProvider(routes)
 
 
 # ---------------------------------------------------------------------------
@@ -562,16 +614,48 @@ class LLMGateway:
         return self.provider.name == "mock"
 
     @property
+    def failover(self) -> Any:
+        """The FailoverProvider when several routes are configured, else None."""
+        return self.provider if self.provider.name == "failover" else None
+
+    @property
     def copilot_mode(self) -> str:
-        """Which model family drives the Copilot tool loop, or the offline planner when none can."""
+        """Which model family drives the Copilot tool loop now, or the offline planner when none can."""
         if self.is_mock or not hasattr(self.provider, "create_with_tools"):
             return "offline_planner"
-        return "claude" if self.provider.name == "anthropic" else self.provider.name
+        name = self.provider.name
+        if self.failover is not None:
+            route = self.failover.active_route(tools=True)
+            if route is None:
+                return "offline_planner"
+            name = route.provider.name
+        return "claude" if name == "anthropic" else name
+
+    def ai_status(self) -> dict[str, Any]:
+        """Provider/route availability for the dashboard."""
+        if self.failover is not None:
+            return self.failover.status()
+        if self.is_mock:
+            return {"available": False, "active": None, "next_available_at": None, "routes": []}
+        default, fast = self.resolve_model("default"), self.resolve_model("fast")
+        return {"available": True, "active": {"provider": self.provider.name, "model": default}, "next_available_at": None, "routes": [{"provider": self.provider.name, "model": default, "fast_model": fast, "tools": hasattr(self.provider, "create_with_tools"), "state": "ready", "until": None, "reason": None}]}
 
     def resolve_model(self, tier: str = "default", override: str | None = None) -> str:
         if override:
             return override
-        return self.settings.llm_fast_model if tier == "fast" else self.settings.llm_default_model
+        if self.failover is not None:
+            route = self.failover.primary
+            return route.fast_model if tier == "fast" else route.default_model
+        default, fast = self.settings.llm_default_model, self.settings.llm_fast_model
+        from app.llm.failover import model_family
+
+        if not self.is_mock and model_family(default) not in (None, self.provider.name):
+            default, fast = self.settings.models_for(self.provider.name)  # e.g. LLM_PROVIDER=auto picked another family
+        return fast if tier == "fast" else default
+
+    @property
+    def _usage_provider(self) -> str:
+        return getattr(self.provider, "last_used", None) or self.provider.name
 
     def resolve_effort(self, tier: str = "default") -> str:
         return self.settings.llm_fast_effort if tier == "fast" else self.settings.llm_effort
@@ -628,7 +712,7 @@ class LLMGateway:
                 try:
                     parsed_obj, resp = native(model=resolved_model, system=system + "\nNever invent facts that are not supported by the provided data. If information is missing, say so in the designated fields.", user=user, schema=schema, max_tokens=max_tokens or self.settings.llm_max_output_tokens, timeout=self.settings.llm_timeout_seconds, effort=effort)
                     result = self._validate(schema, parsed_obj, task)
-                    usage = LLMUsage(model=resp.model, prompt_tokens=resp.prompt_tokens, completion_tokens=resp.completion_tokens, cost_usd=estimate_cost(resp.model, resp.prompt_tokens, resp.completion_tokens), latency_ms=int((time.perf_counter() - started) * 1000), provider=self.provider.name, calls=attempt + 1)
+                    usage = LLMUsage(model=resp.model, prompt_tokens=resp.prompt_tokens, completion_tokens=resp.completion_tokens, cost_usd=estimate_cost(resp.model, resp.prompt_tokens, resp.completion_tokens), latency_ms=int((time.perf_counter() - started) * 1000), provider=self._usage_provider, calls=attempt + 1)
                     if budget:
                         budget.record(usage)
                     return result, usage
@@ -656,7 +740,7 @@ class LLMGateway:
                     max_tokens=max_tokens or self.settings.llm_max_output_tokens,
                     timeout=self.settings.llm_timeout_seconds,
                     json_mode=True,
-                    **({"effort": effort} if self.provider.name in ("anthropic", "gemini") else {}),
+                    **({"effort": effort} if self.provider.name in ("anthropic", "gemini", "failover") else {}),
                 )
                 parsed = _extract_json(resp.text)
                 result = self._validate(schema, parsed, task)
@@ -666,7 +750,7 @@ class LLMGateway:
                     completion_tokens=resp.completion_tokens,
                     cost_usd=estimate_cost(resp.model, resp.prompt_tokens, resp.completion_tokens),
                     latency_ms=int((time.perf_counter() - started) * 1000),
-                    provider=self.provider.name,
+                    provider=self._usage_provider,
                     calls=attempt + 1,
                 )
                 if budget:

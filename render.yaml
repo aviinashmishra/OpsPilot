@@ -36,9 +36,13 @@ services:
         generateValue: true
       - key: DEMO_PASSWORD         # password for the seeded demo accounts; never use the public default here
         sync: false
-      - key: LLM_PROVIDER
-        value: gemini
+      - key: LLM_PROVIDER          # auto = first key found; extra keys become automatic failover
+        value: auto
       - key: GEMINI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY     # optional: failover when Gemini is out of quota (leave empty to skip)
+        sync: false
+      - key: OPENAI_API_KEY        # optional
         sync: false
       - key: LLM_DEFAULT_MODEL
         value: gemini-3.6-flash
