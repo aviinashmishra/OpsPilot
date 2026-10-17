@@ -42,7 +42,10 @@ export default function AgentDetailPage({ params }: { params: { key: string } })
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const requestedTab = searchParams.get("tab");
-  const tab: AgentTab = (AGENT_TABS as readonly string[]).includes(requestedTab ?? "") ? (requestedTab as AgentTab) : "overview";
+  const canRun = usePermission("agents:run");
+  // Playground and Bulk run only exist for people who can run agents (no dead-end tabs).
+  const allowedTabs: readonly string[] = canRun ? AGENT_TABS : AGENT_TABS.filter((t) => t !== "playground" && t !== "bulk");
+  const tab: AgentTab = allowedTabs.includes(requestedTab ?? "") ? (requestedTab as AgentTab) : "overview";
   const setTab = (next: string) => {
     const query = new URLSearchParams(searchParams.toString());
     if (next === "overview") query.delete("tab");
@@ -51,7 +54,6 @@ export default function AgentDetailPage({ params }: { params: { key: string } })
     router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
   };
   const canAdmin = usePermission("agents:admin");
-  const canRun = usePermission("agents:run");
   const queryClient = useQueryClient();
   const [confirmToggle, setConfirmToggle] = useState<boolean | null>(null);
   const [reason, setReason] = useState("");
@@ -111,12 +113,16 @@ export default function AgentDetailPage({ params }: { params: { key: string } })
           <TabsTrigger value="config">Configuration</TabsTrigger>
           <TabsTrigger value="runs">Runs</TabsTrigger>
           <TabsTrigger value="evaluation">Evaluation</TabsTrigger>
-          <TabsTrigger value="playground">
-            <Play className="h-3.5 w-3.5" aria-hidden /> Playground
-          </TabsTrigger>
-          <TabsTrigger value="bulk">
-            <Layers className="h-3.5 w-3.5" aria-hidden /> Bulk run
-          </TabsTrigger>
+          {canRun ? (
+            <>
+              <TabsTrigger value="playground">
+                <Play className="h-3.5 w-3.5" aria-hidden /> Playground
+              </TabsTrigger>
+              <TabsTrigger value="bulk">
+                <Layers className="h-3.5 w-3.5" aria-hidden /> Bulk run
+              </TabsTrigger>
+            </>
+          ) : null}
         </TabsList>
         <TabsContent value="overview">
           <OverviewTab agent={a} />
@@ -133,12 +139,16 @@ export default function AgentDetailPage({ params }: { params: { key: string } })
         <TabsContent value="evaluation">
           <EvaluationTab agent={a} canAdmin={canAdmin} />
         </TabsContent>
-        <TabsContent value="playground">
-          <PlaygroundTab agent={a} canRun={canRun} />
-        </TabsContent>
-        <TabsContent value="bulk">
-          <BulkRunTab agent={a} canRun={canRun} />
-        </TabsContent>
+        {canRun ? (
+          <>
+            <TabsContent value="playground">
+              <PlaygroundTab agent={a} canRun={canRun} />
+            </TabsContent>
+            <TabsContent value="bulk">
+              <BulkRunTab agent={a} canRun={canRun} />
+            </TabsContent>
+          </>
+        ) : null}
       </Tabs>
 
       <ConfirmDialog

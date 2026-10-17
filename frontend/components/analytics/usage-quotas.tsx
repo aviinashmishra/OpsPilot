@@ -29,7 +29,7 @@ export function UsageQuotas() {
         <CardContent className="space-y-4">
           <Meter label="Workflow runs" value={runs} max={u.quotas.monthly_workflow_runs} tone={meterTone(u.utilization.workflow_runs)} format={(v, m) => `${fmtInt(v)} / ${fmtInt(m)} (${fmtPercent(u.utilization.workflow_runs, 1)})`} />
           <Meter label="LLM tokens" value={tokens} max={u.quotas.monthly_llm_tokens} tone={meterTone(u.utilization.llm_tokens)} format={(v, m) => `${fmtCompact(v)} / ${fmtCompact(m)} (${fmtPercent(u.utilization.llm_tokens, 1)})`} />
-          <p className="text-xs text-fg-subtle">Max concurrent runs: {fmtInt(u.quotas.max_concurrent_runs)}. Utilisation above 80% is flagged as a warning, above 95% as critical.</p>
+          <p className="text-xs text-fg-subtle">Max concurrent runs: {fmtInt(u.quotas.max_concurrent_runs)}</p>
         </CardContent>
       </Card>
       <Card>

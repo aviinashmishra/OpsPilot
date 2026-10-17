@@ -14,6 +14,7 @@ import { StatTile } from "@/components/ui/stat-tile";
 import { EmptyState, ErrorState } from "@/components/ui/states";
 import { SortableTH, TBody, TD, TH, THead, TR, Table, TableWrap } from "@/components/ui/table";
 import { DEPARTMENT_LABELS, PERIOD_OPTIONS } from "@/lib/constants";
+import { usePermission } from "@/lib/permissions";
 import { useReports } from "@/lib/queries";
 import type { ReportAgentRow, ReportWorkflowRow } from "@/lib/types";
 import { fmtCurrency, fmtInt, fmtMinutes, fmtMs, fmtPercent, titleCase } from "@/lib/utils";
@@ -139,6 +140,7 @@ function WorkflowTable({ rows }: { rows: ReportWorkflowRow[] }) {
 export default function AnalyticsPage() {
   const [days, setDays] = useState<number>(30);
   const report = useReports(days);
+  const canSeeUsage = usePermission("usage:read");
   const data = report.data;
   return (
     <div className="space-y-6">
@@ -208,10 +210,12 @@ export default function AnalyticsPage() {
         </>
       ) : null}
 
-      <section aria-label="Usage and quotas" className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-fg-muted">Usage &amp; quotas</h2>
-        {report.isLoading ? <SkeletonRows rows={3} /> : <UsageQuotas />}
-      </section>
+      {canSeeUsage ? (
+        <section aria-label="Usage and quotas" className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-fg-muted">Usage &amp; quotas</h2>
+          {report.isLoading ? <SkeletonRows rows={3} /> : <UsageQuotas />}
+        </section>
+      ) : null}
     </div>
   );
 }

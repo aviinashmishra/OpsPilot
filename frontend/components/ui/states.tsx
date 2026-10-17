@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Inbox, type LucideIcon, RefreshCw } from "lucide-react";
+import { AlertCircle, Inbox, Lock, type LucideIcon, RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,10 @@ export function EmptyState({ icon: Icon = Inbox, title, description, action, cla
 }
 
 export function ErrorState({ error, onRetry, title = "Could not load data", className, compact }: { error: unknown; onRetry?: () => void; title?: ReactNode; className?: string; compact?: boolean }) {
+  if (isApiError(error) && error.status === 403) {
+    // A permission gap, not a failure: explain it in plain words, no retry or technical ids.
+    return <EmptyState icon={Lock} title="You don't have access to this" description="Your role doesn't include it. Ask a workspace administrator if you need it." className={className} compact={compact} />;
+  }
   const message = errorMessage(error);
   const correlation = isApiError(error) ? error.correlationId : null;
   const code = isApiError(error) ? error.code : null;

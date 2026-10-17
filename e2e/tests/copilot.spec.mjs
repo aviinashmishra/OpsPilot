@@ -84,7 +84,8 @@ test.describe("Ops Copilot, custom tools, bulk runs and scale view", () => {
   test("viewer without agents:run sees an explanation instead of the copilot", async ({ page }) => {
     await login(page, "viewer@acme-demo.test");
     await page.goto("/copilot");
-    await expect(page.getByText(/needs permission to run agents/i)).toBeVisible();
+    await expect(page.getByText(/You don't have access to Copilot/i)).toBeVisible();
+    await expect(page.getByRole("link", { name: /Go to Overview/ })).toBeVisible();
   });
 
   test("admin creates, tests and deletes a custom tool", async ({ page }) => {
