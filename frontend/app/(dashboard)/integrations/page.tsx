@@ -139,7 +139,7 @@ function ProvidersTab({ canAdmin }: { canAdmin: boolean }) {
             const Icon = integrationIcon(family?.icon);
             const live = integration.mode === "live";
             return (
-              <article key={integration.id} className="surface-card flex flex-col gap-3 p-4">
+              <article key={integration.id} className="surface-card flex flex-col gap-3 p-4" data-testid={`integration-${integration.provider}`}>
                 <div className="flex items-start gap-3">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-surface-2 text-fg-muted">
                     <Icon className="h-5 w-5" aria-hidden />

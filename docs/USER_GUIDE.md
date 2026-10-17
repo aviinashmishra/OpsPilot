@@ -661,31 +661,34 @@ Each card shows:
 - **Status** (Sandbox, Pending test, Connected, Error), **Last test** (ok/failed and when), **Last sync**, **Secrets** (whether credentials and a webhook secret are stored), the last error, **Capabilities**, **Scopes**, and the number of tools (hover to list them).
 - Buttons: **Configure**, **Test connection**, **Sync**.
 
-Live providers available in this version:
+Real systems you can connect in this version:
 
-| Family | Live provider | Credentials asked for | Non-secret config needed |
+| Family | Connector | What the form asks for | Live operations |
 |---|---|---|---|
-| Team chat | Slack | Bot token | – |
-| CRM | HubSpot | Access token | – |
-| Email | SendGrid | API key | `from_email` (a verified sender) |
-| Issue tracker | Jira | Email, API token | `site_url` (for example `https://your-domain.atlassian.net`) |
-| Commerce | Shopify | Access token | `shop_domain` (for example `my-store.myshopify.com`) |
-| WhatsApp Business | Meta Cloud API | Access token | `phone_number_id` (optional `graph_api_version`; `verify_token` for the webhook handshake) |
-| Helpdesk | Zendesk | Email, API token | `subdomain` |
+| Team chat | **Chat webhook** (Slack, Microsoft Teams, Google Chat, Discord) | The channel's incoming-webhook URL | Post messages (one channel per webhook) |
+| Team chat | Slack (bot) | Bot token (`xoxb-…`) | Post to any channel the bot is in, list channels |
+| Email | **SMTP** (Gmail, Outlook / Microsoft 365, any mail server) | Server, port, username, password (an app password for Gmail/Outlook), From address | Send email |
+| Email | SendGrid | API key, From address (verified sender) | Send email, list templates |
+| CRM | HubSpot | Private app access token | Find, read, list, create and update contacts; customers; log notes; activity history |
+| Helpdesk | Zendesk | Subdomain, agent email, API token | Create, read, list and update tickets (status, priority, tags, internal note); customer case history |
+| Issue tracker | Jira Cloud | Site URL, account email, API token | Search, read, create, comment, update fields, change status through the workflow; list projects |
+| Commerce | Shopify | Shop domain, Admin API token | Products, search, price and stock, inventory, orders, shipments, sales history; update order notes/tags and listings |
+| WhatsApp Business | Meta Cloud API | Phone number ID, access token | Send template and text messages |
 
-Accounting, Google Workspace, Monitoring, Procurement, Feedback sources and Metrics warehouse are sandbox only. (Internally the product's family list also names providers such as SMTP, QuickBooks, Xero, Google Workspace, Datadog and Grafana, but no live connection exists for them yet; the **Configure** dialog only offers the providers in the table above.)
+Each form has a **Where do I find these?** link to the provider's own instructions.
 
-**To switch a family to live:**
-1. Click **Configure**.
-2. Optionally change the **Display name**.
-3. Set **Mode** to **Live** and choose the **Live provider**.
-4. Enter the **Credentials** shown. They are stored encrypted and never shown again; leave a field blank to keep a stored value.
-5. Optionally enter a **Webhook secret** (used to verify messages the provider sends to OpsPilot) and **Scopes** (comma-separated).
-6. Enter the non-secret settings in **Config** as JSON, for example `{"from_email": "ops@yourcompany.com"}`.
-7. Click **Save integration**. The status becomes **Pending test**.
-8. Click **Test connection**. If it passes, the status becomes **Connected** and tools start using the real system. If it fails, the error is shown and the status is **Error**.
+Accounting, Google Workspace, Monitoring, Procurement, Feedback sources and Metrics warehouse have no live connector yet: agents use the workspace's records for them. To call your own systems, add a [custom tool](#custom-tools-tab).
 
-Important: until a live integration is **Connected**, its tools quietly keep using the sandbox. Check the "tools: sandbox / live" badges on agent results to see which was used. To go back to the simulator, set **Mode** to **Sandbox** and save.
+**What happens to operations a connected system does not cover.** Some data only exists in OpsPilot: price lists, sales teams, support and delivery policies, brand guidelines, supplier lead times, marketing consent, and OpsPilot's own email/WhatsApp templates and outbox. These keep coming from the workspace's records (marked `source: workspace`) when the system is live. Everything else a connected system does not support is refused with a clear message. OpsPilot never answers with sample data, and never pretends to have performed an action in a live system.
+
+**To connect a real system:**
+1. On the system's card click **Configure**.
+2. Choose the connector (for example **SMTP** or **HubSpot**) instead of **Sample data (sandbox)**.
+3. Fill in the fields. Secrets are stored encrypted and never shown again; when editing, leave a secret blank to keep the saved one.
+4. Click **Save and test connection**. On success the dialog closes and the status becomes **Connected**: from now on agents use the real system. On failure the dialog stays open and shows the provider's error so you can fix the values.
+5. Optional, under **Advanced**: display name, webhook signing secret (verifies events the system sends to OpsPilot), scopes, extra settings.
+
+To go back to the simulator, open **Configure**, choose **Sample data (sandbox)** and click **Use sample data**. Until a live connection has passed its test, tools keep using the sandbox; the "tools: sandbox / live" badge on agent results shows which was used.
 
 **Test connection** on a sandbox integration just checks the simulator. **Sync** only records a sync time stamp; it does not import data.
 

@@ -49,6 +49,8 @@ def catalog(principal: Principal = Depends(require("integrations:read"))) -> dic
                 **v,
                 "live_supported": [p for (fam, p) in live.LIVE_ADAPTERS if fam == k],
                 "required_credentials": {p: live.REQUIRED_CREDENTIALS.get((k, p), []) for (fam, p) in live.LIVE_ADAPTERS if fam == k},
+                # What the Connect form asks for, per live provider (label, help link, fields).
+                "connection": {p: live.CONNECTION_FIELDS[(k, p)] for (fam, p) in live.LIVE_ADAPTERS if fam == k and (k, p) in live.CONNECTION_FIELDS},
                 "sandbox_capabilities": MOCK_ADAPTERS[k].capabilities if k in MOCK_ADAPTERS else [],
             }
             for k, v in PROVIDER_FAMILIES.items()
@@ -67,12 +69,20 @@ def upsert_integration(body: IntegrationIn, principal: Principal = Depends(requi
     if row is None:
         row = Integration(tenant_id=principal.tenant.id, provider=body.provider, name=body.name)
         db.add(row)
+    previous_provider = (row.config or {}).get("live_provider")
     row.name = body.name
     row.mode = body.mode
     row.config = {**body.config, **({"live_provider": body.live_provider} if body.live_provider else {})}
     row.scopes = body.scopes
     if body.credentials:
-        row.encrypted_credentials = encrypt_secret(json.dumps(body.credentials))
+        # Merge: a form that re-enters one secret (e.g. a new password) keeps the others.
+        stored: dict = {}
+        if row.encrypted_credentials and previous_provider == body.live_provider:
+            try:
+                stored = json.loads(decrypt_secret(row.encrypted_credentials))
+            except Exception:  # noqa: BLE001 - unreadable (rotated key): replace entirely
+                stored = {}
+        row.encrypted_credentials = encrypt_secret(json.dumps({**stored, **body.credentials}))
     if body.webhook_secret:
         row.webhook_secret_encrypted = encrypt_secret(body.webhook_secret)
     # A live integration is never "connected" until a real connection test succeeds.

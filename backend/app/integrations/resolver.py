@@ -2,7 +2,8 @@
 
 Rules:
 * If the tenant has an Integration row for the family with mode="live",
-  status="connected" and stored credentials, build the live adapter.
+  status="connected" and stored credentials, build the live adapter, wrapped in a
+  HybridAdapter (OpsPilot-owned reads come from workspace records; see hybrid.py).
 * Otherwise fall back to the sandbox (mock) adapter and report mode="mock".
 * Never silently treat a mock as live.
 """
@@ -75,7 +76,10 @@ class AdapterResolver:
             live_provider = str(row.config.get("live_provider") or (PROVIDER_FAMILIES[family]["live_providers"] or ["unknown"])[0])
             adapter = _load_live_adapter(family, live_provider, dict(row.config), creds) if creds else None
             if adapter is not None:
-                resolved = ResolvedAdapter(adapter=adapter, mode="live", provider=family, integration_id=row.id, live_provider=live_provider)
+                from app.integrations.hybrid import HybridAdapter
+
+                hybrid = HybridAdapter(adapter, MOCK_ADAPTERS[family](self.db, str(self.tenant_id)), family)
+                resolved = ResolvedAdapter(adapter=hybrid, mode="live", provider=family, integration_id=row.id, live_provider=live_provider)
                 self._cache[family] = resolved
                 return resolved
 

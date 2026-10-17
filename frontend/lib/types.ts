@@ -503,6 +503,24 @@ export interface ConnectionTestOut {
   details: JsonObject;
 }
 
+/** One setting on the Connect form. "credentials" values are encrypted and never returned. */
+export interface ConnectionField {
+  key: string;
+  label: string;
+  store: "config" | "credentials";
+  secret: boolean;
+  required: boolean;
+  placeholder: string;
+  help: string;
+  options?: string[];
+}
+
+export interface ConnectionSpec {
+  label: string;
+  help_url: string;
+  fields: ConnectionField[];
+}
+
 export interface IntegrationFamily {
   key: string;
   label: string;
@@ -510,6 +528,7 @@ export interface IntegrationFamily {
   icon: string;
   live_supported: string[];
   required_credentials: Record<string, string[]>;
+  connection?: Record<string, ConnectionSpec>;
   sandbox_capabilities: string[];
 }
 
